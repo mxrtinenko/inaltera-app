@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* INALTERA Design System - Professional Invoicing Platform */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core brand colors - Bright Blue theme */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Primary - INALTERA Blue #007bff */
+    --primary: 211 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Light blue tint */
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 215 25% 20%;
+
+    --muted: 210 25% 93%;
+    --muted-foreground: 215 15% 50%;
+
+    --accent: 211 90% 95%;
+    --accent-foreground: 211 100% 40%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success - for confirmations */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 211 100% 50%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Professional dark blue */
+    --sidebar-background: 215 28% 17%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 211 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 25%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 20% 25%;
+    --sidebar-ring: 211 100% 50%;
+
+    /* Custom tokens for INALTERA */
+    --inaltera-blue: 211 100% 50%;
+    --inaltera-blue-dark: 211 100% 40%;
+    --inaltera-blue-light: 211 90% 95%;
+    --inaltera-navy: 215 28% 17%;
+    --inaltera-gray: 210 15% 60%;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.1), 0 2px 4px -2px hsl(215 25% 15% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.1), 0 4px 6px -4px hsl(215 25% 15% / 0.1);
+    --shadow-card: 0 1px 3px 0 hsl(215 25% 15% / 0.1), 0 1px 2px -1px hsl(215 25% 15% / 0.1);
+  }
+
+  .dark {
+    --background: 215 28% 10%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 25% 15%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 25% 15%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 211 100% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 20% 20%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 215 20% 20%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 215 25% 25%;
+    --accent-foreground: 211 100% 60%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 25%;
+    --input: 215 20% 25%;
+    --ring: 211 100% 55%;
+
+    --sidebar-background: 215 30% 8%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 211 100% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 18%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 215 20% 18%;
+    --sidebar-ring: 211 100% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+}
+
+@layer components {
+  /* Card styles */
+  .inaltera-card {
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow-card);
+  }
+
+  .inaltera-card-elevated {
+    @apply bg-card rounded-lg border border-border;
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Status badges */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-success {
+    @apply bg-success/10 text-success;
+  }
+
+  .status-warning {
+    @apply bg-warning/10 text-warning;
+  }
+
+  .status-error {
+    @apply bg-destructive/10 text-destructive;
+  }
+
+  .status-pending {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  /* Table styles */
+  .inaltera-table th {
+    @apply text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-4;
+  }
+
+  .inaltera-table td {
+    @apply py-4 px-4 text-sm;
+  }
+
+  .inaltera-table tbody tr {
+    @apply border-b border-border hover:bg-accent/50 transition-colors;
+  }
+
+  /* Input focus states */
+  .inaltera-input {
+    @apply transition-all duration-200;
+  }
+
+  .inaltera-input:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+
+  /* Button hover animation */
+  .btn-hover-lift {
+    @apply transition-all duration-200;
+  }
+
+  .btn-hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Sidebar nav item */
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200;
+  }
+
+  .sidebar-nav-item.active {
+    @apply bg-sidebar-primary text-sidebar-primary-foreground;
+  }
+
+  /* Auth card */
+  .auth-card {
+    @apply bg-card rounded-2xl p-8 w-full max-w-md;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Fade in animation */
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide in animation */
+  .slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
