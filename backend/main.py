@@ -36,6 +36,7 @@ SECRET_KEY = "clave_super_secreta_cambiar_en_produccion"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 300 
 BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
@@ -369,7 +370,7 @@ async def emitir_factura(datos: DatosFactura, db: Session = Depends(get_db), cur
     prev_hash = ultimo_registro.hash_actual if ultimo_registro else "0" * 64
     nuevo_hash = calcular_hash(pdf_bytes, prev_hash)
     
-    texto_qr = f"{BASE_URL}/api/verificar-hash/{nuevo_hash}"
+    texto_qr = f"{FRONTEND_URL}/verificar?h={nuevo_hash}"
 
     # 5. GUARDAR EN DB
     num_factura = f"F-{datetime.now().strftime('%Y%m%d-%H%M')}"
@@ -431,7 +432,7 @@ def subir_factura_terceros(
     nuevo_hash = hashlib.sha256(datos_para_hash.encode()).hexdigest()
 
     # 5. Texto QR
-    texto_qr = f"{BASE_URL}/api/verificar-hash/{nuevo_hash}"
+    texto_qr = f"{FRONTEND_URL}/verificar?h={nuevo_hash}"
 
     # 6. Parsear fecha
     try:
