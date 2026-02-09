@@ -50,14 +50,16 @@ const Index: React.FC = () => {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      navigate('/registro');
+      // Si ya está logueado, lo mandamos al historial de facturas
+      navigate('/registro-facturas');
     } else {
-      navigate('/registro-usuario');
+      // Si es nuevo, lo mandamos al registro de usuario (ruta correcta)
+      navigate('/registro'); 
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-fade-in">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -65,7 +67,7 @@ const Index: React.FC = () => {
             <Logo size="md" />
             <nav className="flex items-center gap-4">
               {isAuthenticated ? (
-                <Button onClick={() => navigate('/registro')}>
+                <Button onClick={() => navigate('/registro-facturas')}>
                   Ir al Panel
                 </Button>
               ) : (
@@ -88,26 +90,26 @@ const Index: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/10" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6 animate-fade-in">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Shield className="w-4 h-4" />
               Solución certificada NO-VERI*FACTU
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
               Gestiona tus facturas con{' '}
               <span className="text-primary">seguridad criptográfica</span>
             </h1>
-            <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in">
+            <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
               INALTERA te permite emitir, sellar y registrar facturas cumpliendo con 
               la normativa fiscal española. Sin complicaciones, sin errores.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in">
-              <Button size="lg" className="btn-hover-lift text-lg px-8" onClick={handleGetStarted}>
+            
+            {/* BOTONES DE ACCIÓN */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button size="lg" className="btn-hover-lift text-lg px-8 py-6" onClick={handleGetStarted}>
                 Comenzar Gratis
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8">
-                Ver Demo
-              </Button>
+              {/* Botón de Demo eliminado */}
             </div>
           </div>
         </div>
@@ -207,7 +209,7 @@ const Index: React.FC = () => {
           <Button 
             size="lg" 
             variant="secondary"
-            className="btn-hover-lift text-lg px-8"
+            className="btn-hover-lift text-lg px-8 py-6"
             onClick={handleGetStarted}
           >
             Crear Cuenta Gratis
