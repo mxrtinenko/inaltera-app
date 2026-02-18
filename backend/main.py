@@ -13,7 +13,7 @@ from typing import List, Optional
 # Librerías de Terceros
 import qrcode
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, status, Form
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, RedirectResponse # <--- AÑADIDO RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -25,10 +25,10 @@ from passlib.context import CryptContext
 from reportlab.lib.units import mm             
 from reportlab.graphics.barcode import qr     
 from reportlab.graphics import renderPDF    
-from reportlab.graphics.shapes import Drawing  
+from reportlab.graphics.shapes import Drawing 
+from supabase import create_client, Client 
 
 # Importaciones Locales
-# AÑADIDO: Cliente, Producto
 from models import SessionLocal, RegistroFactura, ConfiguracionEmpresa, Usuario, EventoBitacora, Cliente, Producto, Suscripcion
 
 # --- 2. CONFIGURACIÓN DE SEGURIDAD ---
@@ -41,8 +41,19 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:8080")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
+# --- CONFIGURACIÓN SUPABASE ---
+# Asegúrate de que estas variables están en tu .env y en Render
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Inicializamos el cliente. Si fallan las variables, esto daría error al arrancar.
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"Advertencia: Supabase no configurado correctamente: {e}")
+    supabase = None
+
 # --- 3. CONFIGURACIÓN DE LA APP ---
-app = FastAPI(title="INALTERA API", version="2.2.0")
+app = FastAPI(title="INALTERA API", version="2.3.0") # Versión subida a 2.3.0
 
 app.add_middleware(
     CORSMiddleware,
@@ -139,8 +150,12 @@ def registrar_evento(db: Session, categoria: str, descripcion: str, nivel: str =
 async def startup_event():
     # Registramos que el sistema se ha encendido (Req. Veri*factu)
     db = SessionLocal()
-    registrar_evento(db, "SISTEMA", "Sistema Inaltera iniciado correctamente (v2.2)", "INFO")
-    db.close()
+    try:
+        registrar_evento(db, "SISTEMA", "Sistema Inaltera iniciado correctamente (v2.3)", "INFO")
+    except Exception as e:
+        print(f"Error al iniciar bitácora: {e}")
+    finally:
+        db.close()
 
 def crear_token_acceso(data: dict):
     to_encode = data.copy()
@@ -370,6 +385,7 @@ async def emitir_factura(datos: DatosFactura, db: Session = Depends(get_db), cur
     prev_hash = ultimo_registro.hash_actual if ultimo_registro else "0" * 64
     nuevo_hash = calcular_hash(pdf_bytes, prev_hash)
     
+    # Usamos la variable FRONTEND_URL que configuramos antes
     texto_qr = f"{FRONTEND_URL}/verificar?h={nuevo_hash}"
 
     # 5. GUARDAR EN DB
@@ -392,20 +408,41 @@ async def emitir_factura(datos: DatosFactura, db: Session = Depends(get_db), cur
     # LOG (Blockchain Eventos)
     registrar_evento(db, "FACTURACION", f"Factura emitida: {num_factura} ({total_factura:.2f}€)", "INFO", current_user.id)
 
-    # 6. Guardar Archivo Físico
+    # 6. GESTIÓN DEL ARCHIVO FÍSICO
     pdf_sellado = estampar_qr(pdf_bytes, texto_qr)
+    # Usamos el ID + Nombre para evitar duplicados y facilitar la búsqueda en Supabase
     nombre_fisico = f"{nuevo_registro.id}_{nuevo_registro.nombre_archivo}"
+    
+    # A) Guardado Local Temporal (necesario para enviar a Supabase y fallback)
     Path("uploads").mkdir(exist_ok=True)
-    with open(Path("uploads") / nombre_fisico, "wb") as f:
+    ruta_local = Path("uploads") / nombre_fisico
+    
+    with open(ruta_local, "wb") as f:
         f.write(pdf_sellado)
 
+    # B) Subida a la Nube (NUEVO: SUPABASE)
+    if supabase:
+        try:
+            with open(ruta_local, "rb") as f:
+                supabase.storage.from_("facturas").upload(
+                    path=nombre_fisico, 
+                    file=f,
+                    file_options={"content-type": "application/pdf", "upsert": "true"}
+                )
+            print(f"✅ Factura subida a Supabase: {nombre_fisico}")
+            # Opcional: Borrar local para ahorrar espacio en Render
+            # if os.path.exists(ruta_local): os.remove(ruta_local)
+        except Exception as e:
+            print(f"❌ Error subiendo a Supabase: {e}")
+
+    # Retorno
     return {
         "status": "Exito",
-        "mensaje": "Factura generada y guardada",
+        "mensaje": "Factura generada y guardada en la nube",
         "datos_trazabilidad": {"id": nuevo_registro.id, "hash": nuevo_hash}
     }
 
-# --- ENDPOINT RF2: SUBIR Y LEGALIZAR FACTURA DE TERCEROS (CORREGIDO FINAL) ---
+# --- ENDPOINT RF2: SUBIR Y LEGALIZAR FACTURA DE TERCEROS (MODIFICADO SUPABASE) ---
 @app.post("/api/subir-factura")
 def subir_factura_terceros(
     file: UploadFile = File(...),
@@ -461,22 +498,38 @@ def subir_factura_terceros(
     db.commit()
     db.refresh(nuevo_registro) # ¡Aquí obtenemos el ID!
 
-    # 9. AHORA SÍ: ESTAMPAR Y GUARDAR FICHERO (Con el ID delante)
+    # 9. ESTAMPAR Y GUARDAR (Local + Supabase)
     try:
         pdf_sellado = estampar_qr(pdf_content, texto_qr)
         
-        # EL CAMBIO CLAVE: Añadimos el ID al nombre del archivo físico
+        # Nombre único con ID
         nombre_fisico = f"{nuevo_registro.id}_{nombre_final}"
         path_final = Path("uploads") / nombre_fisico
         
         Path("uploads").mkdir(exist_ok=True)
         
+        # A) Guardar Local
         with open(path_final, "wb") as f:
             f.write(pdf_sellado)
             
+        # B) Subir a Supabase
+        if supabase:
+            try:
+                with open(path_final, "rb") as f:
+                    supabase.storage.from_("facturas").upload(
+                        path=nombre_fisico,
+                        file=f,
+                        file_options={"content-type": "application/pdf", "upsert": "true"}
+                    )
+                print(f"✅ Factura Externa subida a Supabase: {nombre_fisico}")
+                # Opcional: Borrar local
+                # if os.path.exists(path_final): os.remove(path_final)
+            except Exception as ex_supa:
+                print(f"❌ Error subiendo a Supabase (Externa): {ex_supa}")
+            
     except Exception as e:
         print(f"Error procesando PDF: {e}")
-        # Si falla, borramos el registro para no dejar "fantasmas"
+        # Si falla el proceso crítico, borramos el registro
         db.delete(nuevo_registro)
         db.commit()
         raise HTTPException(status_code=500, detail="Error al estampar el QR en el PDF")
@@ -486,7 +539,7 @@ def subir_factura_terceros(
     
     return {
         "status": "Exito", 
-        "mensaje": "Factura legalizada correctamente", 
+        "mensaje": "Factura legalizada correctamente y subida a la nube", 
         "id": nuevo_registro.id
     }
 
@@ -547,11 +600,28 @@ def descargar(registro_id: int, db: Session = Depends(get_db), current_user: Usu
     if not reg or reg.usuario_id != current_user.id:
         return {"error": "No encontrada o acceso denegado"}
         
-    ruta = Path("uploads") / f"{reg.id}_{reg.nombre_archivo}"
-    if not ruta.exists(): return {"error": "Archivo no existe"}
+    # --- CAMBIO: DESCARGA DESDE SUPABASE ---
+    if supabase:
+        try:
+            # Reconstruimos el nombre exacto en la nube (ID_NombreArchivo)
+            nombre_nube = f"{reg.id}_{reg.nombre_archivo}"
+            
+            # Obtenemos la URL pública firmada o directa
+            url_publica = supabase.storage.from_("facturas").get_public_url(nombre_nube)
+            
+            # LOG DE AUDITORÍA
+            registrar_evento(db, "DESCARGA", f"Descarga PDF nube {reg.numero_factura}", "INFO", current_user.id)
+            
+            # Redirigimos al usuario a Supabase
+            return RedirectResponse(url=url_publica)
+        except Exception as e:
+            print(f"Error obteniendo URL Supabase: {e}")
+            # Si falla, intentamos fallback local (por si acaso existe)
     
-    # LOG DE AUDITORÍA
-    registrar_evento(db, "DESCARGA", f"Descarga PDF factura {reg.numero_factura}", "INFO", current_user.id)
+    # Fallback Local (Comportamiento antiguo)
+    ruta = Path("uploads") / f"{reg.id}_{reg.nombre_archivo}"
+    if not ruta.exists(): 
+        return {"error": "Archivo no encontrado en servidor ni en nube"}
     
     return FileResponse(ruta, filename=reg.nombre_archivo)
 
@@ -580,7 +650,8 @@ def descargar_json(registro_id: int, db: Session = Depends(get_db), current_user
         },
         "documento": {
             "nombre_archivo": registro.nombre_archivo,
-            "url_qr": registro.datos_qr
+            "url_qr": registro.datos_qr,
+            "almacenamiento": "Supabase Cloud Storage"
         },
         "nota_legal": "Registro generado conforme al reglamento No-Verifactu (Real Decreto 1007/2023)."
     }
