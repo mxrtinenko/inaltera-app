@@ -32,7 +32,6 @@ mmh3==5.2.0
 multidict==6.7.1
 numpy==2.4.2
 oauthlib==3.3.1
-ollama==0.6.1
 packaging==26.0
 pandas==3.0.0
 pillow==12.1.0
@@ -77,3 +76,6 @@ uvicorn==0.40.0
 websockets==15.0.1
 yarl==1.22.0
 zstandard==0.25.0
+qrcode>=7.4.2
+python-multipart
+psycopg2-binary
