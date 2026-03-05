@@ -49,7 +49,8 @@ const Dashboard = () => {
       if (!token) return; 
 
       // Petición segura al backend
-      const response = await fetch(`${API_URL}/api/login`, {
+      // CORRECCIÓN: Cambiado de /api/login a /api/registros
+      const response = await fetch(`${API_URL}/api/registros`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
 
