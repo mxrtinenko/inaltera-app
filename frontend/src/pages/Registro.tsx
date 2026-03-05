@@ -18,7 +18,10 @@ import {
   ChevronRight,
   Ban, 
   CalendarIcon,
-  XCircle
+  XCircle,
+  Eye, // <--- NUEVO ICONO
+  X,   // <--- NUEVO ICONO
+  Loader2 // <--- Para efecto de carga (opcional)
 } from "lucide-react";
 import {
   Table,
@@ -77,6 +80,10 @@ const Registro: React.FC = () => {
   const itemsPerPage = 10;
   const [facturas, setFacturas] = useState<FacturaVisual[]>([]);
   const [, setIsLoading] = useState(true);
+
+  // --- NUEVO STATE PARA EL VISOR ---
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [isViewing, setIsViewing] = useState(false);
 
   // --- 1. CARGAR DATOS ---
   const fetchFacturas = async () => {
@@ -189,6 +196,29 @@ const Registro: React.FC = () => {
     }
   };
 
+  // --- NUEVA FUNCIÓN: VER PDF (Sin descargar) ---
+  const handleViewPdf = async (id: string) => {
+    setIsViewing(true);
+    try {
+        const token = localStorage.getItem('inaltera_token');
+        // Reutilizamos el endpoint de download pero capturamos el blob para visualización
+        const response = await fetch(`${API_URL}/api/download/${id}`, { 
+            headers: { "Authorization": `Bearer ${token}` } 
+        });
+        
+        if (!response.ok) throw new Error("Error cargando PDF");
+        
+        const blob = await response.blob();
+        // Creamos URL temporal para el navegador
+        const url = window.URL.createObjectURL(blob);
+        setPdfViewerUrl(url);
+    } catch (e) {
+        toast({ title: "Error", description: "No se pudo cargar la vista previa.", variant: "destructive" });
+    } finally {
+        setIsViewing(false);
+    }
+  };
+
   // Esta es la función que usa el botón. Llama a downloadSecure internamente.
   const handleDownloadPdf = (id: string, nombreArchivo: string) => {
     downloadSecure(`${API_URL}/api/download/${id}`, nombreArchivo);
@@ -214,7 +244,47 @@ const Registro: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
+      
+      {/* --- MODAL VISOR PDF (NUEVO) --- */}
+      {pdfViewerUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col relative animate-in zoom-in-95 duration-200">
+                {/* Cabecera del Modal */}
+                <div className="flex justify-between items-center p-4 border-b">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-primary" /> Vista Previa del Documento
+                    </h3>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                            setPdfViewerUrl(null);
+                            // Liberamos memoria
+                            if (pdfViewerUrl) window.URL.revokeObjectURL(pdfViewerUrl);
+                        }}
+                    >
+                        <X className="w-6 h-6" />
+                    </Button>
+                </div>
+                
+                {/* Cuerpo del Modal (Iframe) */}
+                <div className="flex-1 bg-gray-100 p-1 relative">
+                    <iframe 
+                        src={pdfViewerUrl} 
+                        className="w-full h-full border-none rounded bg-white"
+                        title="Visor PDF"
+                    />
+                </div>
+                
+                {/* Pie del Modal */}
+                <div className="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
+                    <Button variant="outline" onClick={() => setPdfViewerUrl(null)}>Cerrar</Button>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registro de Facturas</h1>
         <p className="text-muted-foreground">
@@ -317,12 +387,25 @@ const Registro: React.FC = () => {
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           
+                          {/* BOTÓN VER SIN DESCARGAR (NUEVO) */}
+                          {factura.estado !== 'Evento de Anulación' && (
+                             <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-blue-600"
+                                onClick={() => handleViewPdf(factura.id)}
+                                title="Vista Previa"
+                                disabled={isViewing}
+                             >
+                                {isViewing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Eye className="w-4 h-4" />}
+                             </Button>
+                          )}
+
                           {factura.estado !== 'Evento de Anulación' && (
                              <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-8 w-8 text-muted-foreground hover:text-blue-600" 
-                                // AQUÍ ESTABA EL ERROR: Ya llamamos a la función correcta directamente
                                 onClick={() => handleDownloadPdf(factura.id, factura.numero)} 
                                 title="Descargar PDF"
                              >
