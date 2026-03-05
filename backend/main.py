@@ -399,7 +399,10 @@ async def emitir_factura(datos: DatosFactura, db: Session = Depends(get_db), cur
         hash_anterior=prev_hash,
         hash_actual=nuevo_hash,
         datos_qr=texto_qr,
-        usuario_id=current_user.id
+        usuario_id=current_user.id,
+        # --- FIX ESTADÍSTICAS ---
+        tipo="Alta", 
+        fecha_subida=datetime.utcnow()
     )
     db.add(nuevo_registro)
     db.commit()
@@ -486,12 +489,13 @@ def subir_factura_terceros(
         numero_factura=numero,
         cliente=cliente,
         total=total,
-        fecha_subida=fecha_obj,
+        # Usamos utcnow() para el consumo del mes actual, independientemente de la fecha de la factura
+        fecha_subida=datetime.utcnow(), 
         hash_anterior=prev_hash,
         hash_actual=nuevo_hash,
         datos_qr=texto_qr,
         usuario_id=u.id,
-        tipo="Externa"
+        tipo="Alta" # Cambiado de "Externa" a "Alta" para que sume al contador de uso
     )
     
     db.add(nuevo_registro)
