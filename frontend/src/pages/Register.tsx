@@ -111,14 +111,14 @@ const Register: React.FC = () => {
 
         if (response.ok) {
             toast({ title: '¡Todo listo!', description: 'Datos de empresa guardados correctamente.' });
-            navigate('/'); // Al Dashboard directamente
+            navigate('/dashboard'); // Al Dashboard directamente
         } else {
             toast({ title: 'Aviso', description: 'No se pudieron guardar los datos. Podrás hacerlo luego en Ajustes.', variant: 'destructive' });
-            navigate('/'); // Al Dashboard aunque falle, no lo bloqueamos
+            navigate('/dashboard'); // Al Dashboard aunque falle, no lo bloqueamos
         }
     } catch (error) {
         console.error(error);
-        navigate('/'); // Al Dashboard si hay error de red
+        navigate('/dashboard '); // Al Dashboard si hay error de red
     } finally {
         setIsLoading(false);
     }
@@ -126,7 +126,7 @@ const Register: React.FC = () => {
 
   // --- SALTAR PASO 2 Y ENTRAR ---
   const handleSkip = () => {
-      navigate('/'); // Lo mandamos al panel principal (Dashboard) directamente
+      navigate('/dashboard'); // Lo mandamos al panel principal (Dashboard) directamente
   };
 
   return (
