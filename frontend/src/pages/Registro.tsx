@@ -22,8 +22,7 @@ import {
   Eye, 
   X,   
   Loader2,
-  UploadCloud, // <--- NUEVO ICONO
-  Laptop       // <--- NUEVO ICONO
+  UploadCloud // <--- SOLO DEJAMOS ESTE ICONO
 } from "lucide-react";
 import {
   Table,
@@ -68,7 +67,7 @@ interface FacturaVisual {
   total: number;
   estado: string;
   hash?: string;
-  origen: "Nativa" | "Externa"; // <--- NUEVO CAMPO
+  origen: "Nativa" | "Externa"; 
 }
 
 const Registro: React.FC = () => {
@@ -101,13 +100,11 @@ const Registro: React.FC = () => {
           const data: FacturaBackend[] = await response.json();
           
           const facturasMapeadas: FacturaVisual[] = data.map((item) => {
-            // Lógica de detección: Si empieza por F- y tiene 8 números y luego 4 números, es nativa de la App.
             const esNativa = /^F-\d{8}-\d{4}$/.test(item.numero_factura);
 
             return {
               id: item.id.toString(),
               fecha: new Date(item.fecha_subida),
-              // Ajustado para leer el estado y marcar como Rectificativa correctamente
               tipo: item.estado === "Evento de Anulación" ? "Rectificativa" : "Emitida", 
               numero: item.numero_factura || item.nombre_archivo,
               cliente: item.cliente || "General",
@@ -351,7 +348,7 @@ const Registro: React.FC = () => {
                 <TableRow>
                   <TableHead className="w-[120px]">Fecha</TableHead>
                   <TableHead className="w-[120px]">Tipo</TableHead>
-                  <TableHead>Número / Origen</TableHead>
+                  <TableHead>Número</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead className="text-right">Total (€)</TableHead>
                   <TableHead className="text-center w-[120px]">Estado</TableHead>
@@ -369,17 +366,15 @@ const Registro: React.FC = () => {
                           {getTypeBadge(factura.tipo)}
                       </TableCell>
                       
-                      {/* --- COLUMNA ACTUALIZADA: NÚMERO Y ORIGEN --- */}
+                      {/* --- COLUMNA ACTUALIZADA: NÚMERO CON ICONO SUTIL --- */}
                       <TableCell className={`font-mono text-sm ${factura.estado === 'Anulada' ? 'line-through text-muted-foreground' : ''}`}>
-                        <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
                             <span>{factura.numero}</span>
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 font-sans font-medium">
-                                {factura.origen === "Nativa" ? (
-                                    <><Laptop className="w-3 h-3 text-primary" /> Creada en App</>
-                                ) : (
-                                    <><UploadCloud className="w-3 h-3 text-amber-500" /> Subida externa</>
-                                )}
-                            </span>
+                            {factura.origen === "Externa" && (
+                                <div title="Factura subida externamente" className="flex items-center justify-center p-1 bg-amber-100 rounded-md">
+                                    <UploadCloud className="w-3 h-3 text-amber-600" />
+                                </div>
+                            )}
                         </div>
                       </TableCell>
 
