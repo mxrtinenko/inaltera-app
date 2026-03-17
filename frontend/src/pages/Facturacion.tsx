@@ -17,7 +17,7 @@ import {
   Loader2,
   CloudUpload,
   File,
-  ExternalLink 
+  Type // <--- NUEVO ICONO PARA MODO MANUAL
 } from 'lucide-react';
 import {
   Select,
@@ -48,6 +48,7 @@ interface InvoiceLine {
   cantidad: number;
   precioUnitario: number;
   iva: number;
+  isManual: boolean; // <--- NUEVO: Para saber si la línea es manual
 }
 
 const Facturacion: React.FC = () => {
@@ -59,9 +60,13 @@ const Facturacion: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
 
+  // --- NUEVO: ESTADOS PARA MODO MANUAL ---
+  const [isManualClient, setIsManualClient] = useState(false);
+  const [manualClientData, setManualClientData] = useState({ nombre: '', nif: '' });
+
   const [selectedClienteId, setSelectedClienteId] = useState('');
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([
-    { id: '1', producto: '', cantidad: 1, precioUnitario: 0, iva: 21 },
+    { id: '1', producto: '', cantidad: 1, precioUnitario: 0, iva: 21, isManual: false },
   ]);
   const [notas, setNotas] = useState('');
   const [lastHash, setLastHash] = useState<string | null>(null);
@@ -69,7 +74,6 @@ const Facturacion: React.FC = () => {
   // --- ESTADOS PARA SUBIDA PDF (Cargar Factura) ---
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  // NUEVO: Estado para los metadatos manuales del PDF
   const [uploadFormData, setUploadFormData] = useState({
     numero: '',
     cliente: '',
@@ -84,13 +88,11 @@ const Facturacion: React.FC = () => {
         if (!token) return;
 
         try {
-            // 1. Cargar Clientes
             const resCli = await fetch(`${API_URL}/api/clientes`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (resCli.ok) setClientes(await resCli.json());
 
-            // 2. Cargar Productos
             const resProd = await fetch(`${API_URL}/api/productos`, {
                 headers: { "Authorization": `Bearer ${token}` }
             });
@@ -106,7 +108,7 @@ const Facturacion: React.FC = () => {
   const addLine = () => {
     setInvoiceLines([
       ...invoiceLines,
-      { id: Date.now().toString(), producto: '', cantidad: 1, precioUnitario: 0, iva: 21 },
+      { id: Date.now().toString(), producto: '', cantidad: 1, precioUnitario: 0, iva: 21, isManual: false },
     ]);
   };
 
@@ -116,10 +118,18 @@ const Facturacion: React.FC = () => {
     }
   };
 
-  const updateLine = (id: string, field: keyof InvoiceLine, value: string | number) => {
+  const updateLine = (id: string, field: keyof InvoiceLine, value: any) => {
     setInvoiceLines(
       invoiceLines.map((line) =>
         line.id === id ? { ...line, [field]: value } : line
+      )
+    );
+  };
+
+  const toggleLineManualMode = (id: string) => {
+    setInvoiceLines(
+      invoiceLines.map((line) =>
+        line.id === id ? { ...line, isManual: !line.isManual, producto: '' } : line
       )
     );
   };
@@ -168,14 +178,15 @@ const Facturacion: React.FC = () => {
     }, 0);
   };
 
-  // --- FUNCIÓN DE EMISIÓN (CON TOKEN) ---
+  // --- FUNCIÓN DE EMISIÓN (ACTUALIZADA PARA DATOS MANUALES) ---
   const handleGenerateInvoice = async () => {
-    if (!selectedClienteId) {
-      toast({
-        title: 'Error',
-        description: 'Selecciona un cliente',
-        variant: 'destructive',
-      });
+    // Validación inicial
+    if (!isManualClient && !selectedClienteId) {
+      toast({ title: 'Error', description: 'Selecciona un cliente del catálogo o introdúcelo manualmente', variant: 'destructive' });
+      return;
+    }
+    if (isManualClient && (!manualClientData.nombre || !manualClientData.nif)) {
+      toast({ title: 'Error', description: 'Rellena el nombre y el NIF del cliente manual', variant: 'destructive' });
       return;
     }
 
@@ -185,13 +196,24 @@ const Facturacion: React.FC = () => {
       const token = localStorage.getItem('inaltera_token');
       if (!token) throw new Error("Sesión expirada. Por favor haz login de nuevo.");
 
-      const clienteObj = clientes.find(c => c.id.toString() === selectedClienteId);
+      // Determinar qué datos de cliente enviar
+      let payloadNombre = "";
+      let payloadNif = "";
+
+      if (isManualClient) {
+        payloadNombre = manualClientData.nombre;
+        payloadNif = manualClientData.nif;
+      } else {
+        const clienteObj = clientes.find(c => c.id.toString() === selectedClienteId);
+        payloadNombre = clienteObj ? clienteObj.nombre : "Cliente Desconocido";
+        payloadNif = clienteObj ? clienteObj.nif : "00000000T";
+      }
       
       const payload = {
-        cliente_nombre: clienteObj ? clienteObj.nombre : "Cliente Desconocido",
-        cliente_nif: clienteObj ? clienteObj.nif : "00000000T",
+        cliente_nombre: payloadNombre,
+        cliente_nif: payloadNif,
         items: invoiceLines.map(line => ({
-          producto: line.producto || "Producto vario", 
+          producto: line.producto || "Producto genérico", 
           cantidad: line.cantidad,
           precio_unitario: line.precioUnitario,
           iva: line.iva
@@ -217,8 +239,12 @@ const Facturacion: React.FC = () => {
         });
         
         setLastHash(data.datos_trazabilidad.hash);
-        setInvoiceLines([{ id: Date.now().toString(), producto: '', cantidad: 1, precioUnitario: 0, iva: 21 }]);
+        // Limpiar el formulario
+        setInvoiceLines([{ id: Date.now().toString(), producto: '', cantidad: 1, precioUnitario: 0, iva: 21, isManual: false }]);
         setNotas('');
+        if (isManualClient) {
+            setManualClientData({ nombre: '', nif: '' });
+        }
       } else {
         throw new Error(data.detail || "Error en el servidor");
       }
@@ -235,13 +261,12 @@ const Facturacion: React.FC = () => {
     }
   };
 
-  // --- FUNCIÓN DE SUBIDA PDF (ACTUALIZADA RF2) ---
+  // --- FUNCIÓN DE SUBIDA PDF ---
   const handleUploadPdf = async () => {
     if (!uploadedFile) {
         toast({ title: 'Error', description: 'Debes seleccionar un archivo PDF.', variant: 'destructive' });
         return;
     }
-    // Validar campos manuales
     if (!uploadFormData.numero || !uploadFormData.cliente || !uploadFormData.total) {
         toast({ title: 'Datos incompletos', description: 'Rellena el número, cliente y total.', variant: 'destructive' });
         return;
@@ -255,59 +280,39 @@ const Facturacion: React.FC = () => {
 
       const formData = new FormData();
       formData.append("file", uploadedFile);
-      // Añadimos los metadatos manuales
       formData.append("numero", uploadFormData.numero);
       formData.append("cliente", uploadFormData.cliente);
       formData.append("total", uploadFormData.total);
       formData.append("fecha", uploadFormData.fecha);
 
-      // CAMBIO IMPORTANTE: Endpoint actualizado a /api/subir-factura
       const response = await fetch(`${API_URL}/api/subir-factura`, {
         method: "POST",
-        headers: {
-            "Authorization": `Bearer ${token}`
-        },
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData,
       });
 
       if (response.ok) {
-        // const data = await response.json(); // El backend nuevo devuelve status, mensaje e id
         toast({
           title: '¡PDF procesado y Sellado!',
           description: `Factura legalizada y guardada en el historial.`,
         });
         
-        // Limpiamos
         setUploadedFile(null); 
-        setUploadFormData({
-            numero: '',
-            cliente: '',
-            total: '',
-            fecha: new Date().toISOString().split('T')[0]
-        });
-        setLastHash(null); // Reseteamos hash anterior
-        
-        // Redirigimos al registro para que el usuario vea la factura nueva
+        setUploadFormData({ numero: '', cliente: '', total: '', fecha: new Date().toISOString().split('T')[0] });
+        setLastHash(null);
         navigate('/registro-facturas');
 
       } else {
         const errData = await response.json();
         throw new Error(errData.detail || "El servidor devolvió un error");
       }
-
     } catch (error: any) {
-      console.error("Error subiendo archivo:", error);
-      toast({
-        title: 'Error',
-        description: error.message || 'No se pudo procesar el archivo.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message || 'No se pudo procesar el archivo.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Drag and Drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -355,7 +360,6 @@ const Facturacion: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* Create Invoice Tab (SIN CAMBIOS) */}
         <TabsContent value="elaborar" className="space-y-6">
           <Card className="inaltera-card">
             <CardHeader>
@@ -366,33 +370,69 @@ const Facturacion: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               
-              <div className="space-y-2">
-                <Label>Cliente</Label>
-                <Select value={selectedClienteId} onValueChange={handleClientSelectChange}>
-                  <SelectTrigger className="inaltera-input">
-                    <SelectValue placeholder="Selecciona un cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientes.length === 0 ? (
-                        <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
-                    ) : (
-                        clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id.toString()}>
-                            {cliente.nombre} ({cliente.nif})
-                        </SelectItem>
-                        ))
-                    )}
-                    <SelectSeparator />
-                    <SelectItem value="ADD_NEW_CLIENT_ACTION" className="text-primary font-medium cursor-pointer bg-primary/5 hover:bg-primary/10">
-                        <span className="flex items-center gap-2"><Plus className="w-4 h-4"/> Añadir nuevo cliente...</span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* --- SECCIÓN CLIENTE --- */}
+              <div className="space-y-2 bg-muted/20 p-4 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-semibold">Datos del Cliente</Label>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsManualClient(!isManualClient)}
+                        className="text-primary hover:text-primary/80"
+                    >
+                        {isManualClient ? "Elegir del Catálogo" : <span className="flex items-center gap-1"><Type className="w-3 h-3"/> Escribir manualmente</span>}
+                    </Button>
+                </div>
+
+                {isManualClient ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Nombre / Razón Social</Label>
+                            <Input 
+                                placeholder="Ej: Juan Pérez" 
+                                value={manualClientData.nombre}
+                                onChange={(e) => setManualClientData({...manualClientData, nombre: e.target.value})}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs">NIF / CIF</Label>
+                            <Input 
+                                placeholder="Ej: 12345678Z" 
+                                value={manualClientData.nif}
+                                onChange={(e) => setManualClientData({...manualClientData, nif: e.target.value})}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                        <Select value={selectedClienteId} onValueChange={handleClientSelectChange}>
+                          <SelectTrigger className="inaltera-input">
+                            <SelectValue placeholder="Selecciona un cliente de tu catálogo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clientes.length === 0 ? (
+                                <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
+                            ) : (
+                                clientes.map((cliente) => (
+                                <SelectItem key={cliente.id} value={cliente.id.toString()}>
+                                    {cliente.nombre} ({cliente.nif})
+                                </SelectItem>
+                                ))
+                            )}
+                            <SelectSeparator />
+                            <SelectItem value="ADD_NEW_CLIENT_ACTION" className="text-primary font-medium cursor-pointer bg-primary/5 hover:bg-primary/10">
+                                <span className="flex items-center gap-2"><Plus className="w-4 h-4"/> Añadir al catálogo para el futuro...</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                    </div>
+                )}
               </div>
 
+              {/* --- SECCIÓN LÍNEAS DE FACTURA --- */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Líneas de Factura</Label>
+                  <Label className="text-base font-semibold">Líneas de Factura</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addLine}>
                     <Plus className="w-4 h-4 mr-1" /> Añadir línea
                   </Button>
@@ -400,32 +440,48 @@ const Facturacion: React.FC = () => {
 
                 <div className="space-y-3">
                   {invoiceLines.map((line) => (
-                    <div key={line.id} className="grid grid-cols-12 gap-3 items-end p-3 bg-muted/50 rounded-lg">
+                    <div key={line.id} className="grid grid-cols-12 gap-3 items-end p-3 bg-muted/30 rounded-lg border border-border/50">
+                      
                       <div className="col-span-12 md:col-span-4 space-y-1">
-                        <Label className="text-xs">Producto/Servicio</Label>
-                        <Select 
-                            value={getProductIdByName(line.producto)} 
-                            onValueChange={(val) => handleProductChange(line.id, val)}
-                        >
-                            <SelectTrigger className="inaltera-input h-9">
-                                <SelectValue placeholder="Selecciona..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {productos.length === 0 ? (
-                                    <SelectItem value="none" disabled>No hay productos</SelectItem>
-                                ) : (
-                                    productos.map(p => (
-                                        <SelectItem key={p.id} value={p.id.toString()}>
-                                            {p.nombre}
-                                        </SelectItem>
-                                    ))
-                                )}
-                                <SelectSeparator />
-                                <SelectItem value="ADD_NEW_PRODUCT_ACTION" className="text-primary font-medium cursor-pointer bg-primary/5 hover:bg-primary/10">
-                                    <span className="flex items-center gap-2"><Plus className="w-4 h-4"/> Añadir nuevo producto...</span>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                        <div className="flex justify-between items-center mb-1">
+                            <Label className="text-xs">Producto/Servicio</Label>
+                            <button 
+                                type="button"
+                                onClick={() => toggleLineManualMode(line.id)}
+                                className="text-[10px] text-primary hover:underline"
+                            >
+                                {line.isManual ? "Usar Catálogo" : "Escribir Manual"}
+                            </button>
+                        </div>
+                        
+                        {line.isManual ? (
+                            <Input 
+                                placeholder="Ej: Consultoría web"
+                                value={line.producto}
+                                onChange={(e) => updateLine(line.id, 'producto', e.target.value)}
+                                className="h-9"
+                            />
+                        ) : (
+                            <Select 
+                                value={getProductIdByName(line.producto)} 
+                                onValueChange={(val) => handleProductChange(line.id, val)}
+                            >
+                                <SelectTrigger className="inaltera-input h-9">
+                                    <SelectValue placeholder="Selecciona..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {productos.length === 0 ? (
+                                        <SelectItem value="none" disabled>No hay productos</SelectItem>
+                                    ) : (
+                                        productos.map(p => (
+                                            <SelectItem key={p.id} value={p.id.toString()}>
+                                                {p.nombre}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        )}
                       </div>
 
                       <div className="col-span-4 md:col-span-2 space-y-1">
@@ -540,9 +596,9 @@ const Facturacion: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* Upload PDF Tab (ACTUALIZADO CON FORMULARIO) */}
         <TabsContent value="cargar" className="space-y-6">
-          <Card className="inaltera-card">
+            {/* ESTA PESTAÑA SE MANTIENE EXACTAMENTE IGUAL */}
+            <Card className="inaltera-card">
             <CardHeader>
               <CardTitle>Cargar Factura PDF</CardTitle>
               <CardDescription>
@@ -550,18 +606,13 @@ const Facturacion: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              
-              {/* Dropzone */}
               <div
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 className={`
                   border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200
-                  ${isDragging 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                  }
+                  ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50'}
                   ${uploadedFile ? 'bg-success/5 border-success' : ''}
                 `}
               >
@@ -576,13 +627,7 @@ const Facturacion: React.FC = () => {
                         {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setUploadedFile(null)}
-                    >
-                      Cambiar archivo
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setUploadedFile(null)}>Cambiar archivo</Button>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -590,23 +635,12 @@ const Facturacion: React.FC = () => {
                       <CloudUpload className="w-8 h-8 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium text-foreground">
-                        Arrastra tu PDF aquí
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        o haz clic para seleccionar
-                      </p>
+                      <p className="font-medium text-foreground">Arrastra tu PDF aquí</p>
+                      <p className="text-sm text-muted-foreground">o haz clic para seleccionar</p>
                     </div>
                     <label className="cursor-pointer">
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                      <Button variant="outline" size="sm" asChild>
-                        <span>Seleccionar PDF</span>
-                      </Button>
+                      <input type="file" accept=".pdf" onChange={handleFileSelect} className="hidden" />
+                      <Button variant="outline" size="sm" asChild><span>Seleccionar PDF</span></Button>
                     </label>
                   </div>
                 )}
@@ -614,77 +648,42 @@ const Facturacion: React.FC = () => {
 
               <div className="border-t my-2"></div>
 
-              {/* Formulario de Metadatos Manuales */}
               <div className="space-y-4">
                   <Label className="text-base font-semibold">Datos de la Factura Externa</Label>
-                  <p className="text-xs text-muted-foreground -mt-3">
-                      Introduce los datos clave para generar el Hash legal.
-                  </p>
+                  <p className="text-xs text-muted-foreground -mt-3">Introduce los datos clave para generar el Hash legal.</p>
                   
                   <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                           <Label>Número de Factura</Label>
-                          <Input 
-                              placeholder="Ej: F-2024-EX-01" 
-                              value={uploadFormData.numero}
-                              onChange={(e) => setUploadFormData({...uploadFormData, numero: e.target.value})}
-                          />
+                          <Input placeholder="Ej: F-2024-EX-01" value={uploadFormData.numero} onChange={(e) => setUploadFormData({...uploadFormData, numero: e.target.value})} />
                       </div>
                       <div className="space-y-2">
                           <Label>Fecha Emisión</Label>
-                          <Input 
-                              type="date"
-                              value={uploadFormData.fecha}
-                              onChange={(e) => setUploadFormData({...uploadFormData, fecha: e.target.value})}
-                          />
+                          <Input type="date" value={uploadFormData.fecha} onChange={(e) => setUploadFormData({...uploadFormData, fecha: e.target.value})} />
                       </div>
                   </div>
 
                   <div className="space-y-2">
                       <Label>Nombre Cliente</Label>
-                      <Input 
-                          placeholder="Nombre del cliente..." 
-                          value={uploadFormData.cliente}
-                          onChange={(e) => setUploadFormData({...uploadFormData, cliente: e.target.value})}
-                      />
+                      <Input placeholder="Nombre del cliente..." value={uploadFormData.cliente} onChange={(e) => setUploadFormData({...uploadFormData, cliente: e.target.value})} />
                   </div>
 
                   <div className="space-y-2">
                       <Label>Total Factura (€)</Label>
                       <div className="relative">
-                          <Input 
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-6 font-mono font-bold"
-                              value={uploadFormData.total}
-                              onChange={(e) => setUploadFormData({...uploadFormData, total: e.target.value})}
-                          />
+                          <Input type="number" step="0.01" placeholder="0.00" className="pl-6 font-mono font-bold" value={uploadFormData.total} onChange={(e) => setUploadFormData({...uploadFormData, total: e.target.value})} />
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
                       </div>
                   </div>
               </div>
 
-              {/* Submit */}
-              <Button
-                onClick={handleUploadPdf}
-                disabled={!uploadedFile || isLoading}
-                className="w-full btn-hover-lift"
-                size="lg"
-              >
+              <Button onClick={handleUploadPdf} disabled={!uploadedFile || isLoading} className="w-full btn-hover-lift" size="lg">
                 {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Procesando...
-                  </>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Procesando...</>
                 ) : (
-                  <>
-                    <FileCheck className="w-4 h-4 mr-2" />
-                    Cargar y Sellar PDF
-                  </>
+                  <><FileCheck className="w-4 h-4 mr-2" /> Cargar y Sellar PDF</>
                 )}
               </Button>
-
             </CardContent>
           </Card>
         </TabsContent>
