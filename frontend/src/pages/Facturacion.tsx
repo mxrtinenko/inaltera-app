@@ -17,7 +17,8 @@ import {
   Loader2,
   CloudUpload,
   File,
-  Type // <--- NUEVO ICONO PARA MODO MANUAL
+  PenLine,   // <--- ICONO PARA MODO MANUAL
+  BookText   // <--- ICONO PARA MODO CATÁLOGO
 } from 'lucide-react';
 import {
   Select,
@@ -48,7 +49,7 @@ interface InvoiceLine {
   cantidad: number;
   precioUnitario: number;
   iva: number;
-  isManual: boolean; // <--- NUEVO: Para saber si la línea es manual
+  isManual: boolean; 
 }
 
 const Facturacion: React.FC = () => {
@@ -60,7 +61,7 @@ const Facturacion: React.FC = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
 
-  // --- NUEVO: ESTADOS PARA MODO MANUAL ---
+  // --- ESTADOS PARA MODO MANUAL ---
   const [isManualClient, setIsManualClient] = useState(false);
   const [manualClientData, setManualClientData] = useState({ nombre: '', nif: '' });
 
@@ -180,7 +181,6 @@ const Facturacion: React.FC = () => {
 
   // --- FUNCIÓN DE EMISIÓN (ACTUALIZADA PARA DATOS MANUALES) ---
   const handleGenerateInvoice = async () => {
-    // Validación inicial
     if (!isManualClient && !selectedClienteId) {
       toast({ title: 'Error', description: 'Selecciona un cliente del catálogo o introdúcelo manualmente', variant: 'destructive' });
       return;
@@ -196,7 +196,6 @@ const Facturacion: React.FC = () => {
       const token = localStorage.getItem('inaltera_token');
       if (!token) throw new Error("Sesión expirada. Por favor haz login de nuevo.");
 
-      // Determinar qué datos de cliente enviar
       let payloadNombre = "";
       let payloadNif = "";
 
@@ -239,7 +238,6 @@ const Facturacion: React.FC = () => {
         });
         
         setLastHash(data.datos_trazabilidad.hash);
-        // Limpiar el formulario
         setInvoiceLines([{ id: Date.now().toString(), producto: '', cantidad: 1, precioUnitario: 0, iva: 21, isManual: false }]);
         setNotas('');
         if (isManualClient) {
@@ -372,61 +370,66 @@ const Facturacion: React.FC = () => {
               
               {/* --- SECCIÓN CLIENTE --- */}
               <div className="space-y-2 bg-muted/20 p-4 rounded-lg border">
-                <div className="flex items-center justify-between mb-2">
-                    <Label className="text-base font-semibold">Datos del Cliente</Label>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setIsManualClient(!isManualClient)}
-                        className="text-primary hover:text-primary/80"
-                    >
-                        {isManualClient ? "Elegir del Catálogo" : <span className="flex items-center gap-1"><Type className="w-3 h-3"/> Escribir manualmente</span>}
-                    </Button>
-                </div>
+                <Label className="text-base font-semibold block mb-2">Datos del Cliente</Label>
+                
+                <div className="flex gap-3 items-start">
+                  <Button 
+                      type="button"
+                      variant="outline" 
+                      size="icon" 
+                      className="shrink-0"
+                      onClick={() => setIsManualClient(!isManualClient)}
+                      title={isManualClient ? "Elegir del catálogo" : "Escribir manualmente"}
+                  >
+                      {isManualClient ? <BookText className="w-4 h-4 text-primary" /> : <PenLine className="w-4 h-4 text-primary" />}
+                  </Button>
 
-                {isManualClient ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                        <div className="space-y-1">
-                            <Label className="text-xs">Nombre / Razón Social</Label>
-                            <Input 
-                                placeholder="Ej: Juan Pérez" 
-                                value={manualClientData.nombre}
-                                onChange={(e) => setManualClientData({...manualClientData, nombre: e.target.value})}
-                            />
+                  <div className="flex-1">
+                    {isManualClient ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Nombre / Razón Social</Label>
+                                <Input 
+                                    placeholder="Ej: Juan Pérez" 
+                                    value={manualClientData.nombre}
+                                    onChange={(e) => setManualClientData({...manualClientData, nombre: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">NIF / CIF</Label>
+                                <Input 
+                                    placeholder="Ej: 12345678Z" 
+                                    value={manualClientData.nif}
+                                    onChange={(e) => setManualClientData({...manualClientData, nif: e.target.value})}
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-xs">NIF / CIF</Label>
-                            <Input 
-                                placeholder="Ej: 12345678Z" 
-                                value={manualClientData.nif}
-                                onChange={(e) => setManualClientData({...manualClientData, nif: e.target.value})}
-                            />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="animate-in fade-in slide-in-from-top-2">
-                        <Select value={selectedClienteId} onValueChange={handleClientSelectChange}>
-                          <SelectTrigger className="inaltera-input">
-                            <SelectValue placeholder="Selecciona un cliente de tu catálogo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clientes.length === 0 ? (
-                                <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
-                            ) : (
-                                clientes.map((cliente) => (
-                                <SelectItem key={cliente.id} value={cliente.id.toString()}>
-                                    {cliente.nombre} ({cliente.nif})
+                    ) : (
+                        <div className="animate-in fade-in slide-in-from-top-2">
+                            <Select value={selectedClienteId} onValueChange={handleClientSelectChange}>
+                              <SelectTrigger className="inaltera-input">
+                                <SelectValue placeholder="Selecciona un cliente de tu catálogo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clientes.length === 0 ? (
+                                    <SelectItem value="none" disabled>No hay clientes registrados</SelectItem>
+                                ) : (
+                                    clientes.map((cliente) => (
+                                    <SelectItem key={cliente.id} value={cliente.id.toString()}>
+                                        {cliente.nombre} ({cliente.nif})
+                                    </SelectItem>
+                                    ))
+                                )}
+                                <SelectSeparator />
+                                <SelectItem value="ADD_NEW_CLIENT_ACTION" className="text-primary font-medium cursor-pointer bg-primary/5 hover:bg-primary/10">
+                                    <span className="flex items-center gap-2"><Plus className="w-4 h-4"/> Añadir al catálogo para el futuro...</span>
                                 </SelectItem>
-                                ))
-                            )}
-                            <SelectSeparator />
-                            <SelectItem value="ADD_NEW_CLIENT_ACTION" className="text-primary font-medium cursor-pointer bg-primary/5 hover:bg-primary/10">
-                                <span className="flex items-center gap-2"><Plus className="w-4 h-4"/> Añadir al catálogo para el futuro...</span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                    </div>
-                )}
+                              </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* --- SECCIÓN LÍNEAS DE FACTURA --- */}
@@ -443,45 +446,51 @@ const Facturacion: React.FC = () => {
                     <div key={line.id} className="grid grid-cols-12 gap-3 items-end p-3 bg-muted/30 rounded-lg border border-border/50">
                       
                       <div className="col-span-12 md:col-span-4 space-y-1">
-                        <div className="flex justify-between items-center mb-1">
-                            <Label className="text-xs">Producto/Servicio</Label>
-                            <button 
-                                type="button"
-                                onClick={() => toggleLineManualMode(line.id)}
-                                className="text-[10px] text-primary hover:underline"
-                            >
-                                {line.isManual ? "Usar Catálogo" : "Escribir Manual"}
-                            </button>
-                        </div>
+                        <Label className="text-xs">Producto/Servicio</Label>
                         
-                        {line.isManual ? (
-                            <Input 
-                                placeholder="Ej: Consultoría web"
-                                value={line.producto}
-                                onChange={(e) => updateLine(line.id, 'producto', e.target.value)}
-                                className="h-9"
-                            />
-                        ) : (
-                            <Select 
-                                value={getProductIdByName(line.producto)} 
-                                onValueChange={(val) => handleProductChange(line.id, val)}
-                            >
-                                <SelectTrigger className="inaltera-input h-9">
-                                    <SelectValue placeholder="Selecciona..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {productos.length === 0 ? (
-                                        <SelectItem value="none" disabled>No hay productos</SelectItem>
-                                    ) : (
-                                        productos.map(p => (
-                                            <SelectItem key={p.id} value={p.id.toString()}>
-                                                {p.nombre}
-                                            </SelectItem>
-                                        ))
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        )}
+                        <div className="flex gap-2">
+                          <Button 
+                              type="button"
+                              variant="outline" 
+                              size="icon" 
+                              className="shrink-0 h-9 w-9"
+                              onClick={() => toggleLineManualMode(line.id)}
+                              title={line.isManual ? "Elegir del catálogo" : "Escribir manualmente"}
+                          >
+                              {line.isManual ? <BookText className="w-4 h-4 text-primary" /> : <PenLine className="w-4 h-4 text-primary" />}
+                          </Button>
+
+                          <div className="flex-1">
+                            {line.isManual ? (
+                                <Input 
+                                    placeholder="Ej: Consultoría web"
+                                    value={line.producto}
+                                    onChange={(e) => updateLine(line.id, 'producto', e.target.value)}
+                                    className="h-9"
+                                />
+                            ) : (
+                                <Select 
+                                    value={getProductIdByName(line.producto)} 
+                                    onValueChange={(val) => handleProductChange(line.id, val)}
+                                >
+                                    <SelectTrigger className="inaltera-input h-9">
+                                        <SelectValue placeholder="Selecciona..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {productos.length === 0 ? (
+                                            <SelectItem value="none" disabled>No hay productos</SelectItem>
+                                        ) : (
+                                            productos.map(p => (
+                                                <SelectItem key={p.id} value={p.id.toString()}>
+                                                    {p.nombre}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="col-span-4 md:col-span-2 space-y-1">
@@ -596,9 +605,9 @@ const Facturacion: React.FC = () => {
           </Card>
         </TabsContent>
 
+        {/* PESTAÑA CARGAR (SIN CAMBIOS) */}
         <TabsContent value="cargar" className="space-y-6">
-            {/* ESTA PESTAÑA SE MANTIENE EXACTAMENTE IGUAL */}
-            <Card className="inaltera-card">
+          <Card className="inaltera-card">
             <CardHeader>
               <CardTitle>Cargar Factura PDF</CardTitle>
               <CardDescription>
