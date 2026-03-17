@@ -19,9 +19,11 @@ import {
   Ban, 
   CalendarIcon,
   XCircle,
-  Eye, // <--- NUEVO ICONO
-  X,   // <--- NUEVO ICONO
-  Loader2 // <--- Para efecto de carga (opcional)
+  Eye, 
+  X,   
+  Loader2,
+  UploadCloud, // <--- NUEVO ICONO
+  Laptop       // <--- NUEVO ICONO
 } from "lucide-react";
 import {
   Table,
@@ -66,6 +68,7 @@ interface FacturaVisual {
   total: number;
   estado: string;
   hash?: string;
+  origen: "Nativa" | "Externa"; // <--- NUEVO CAMPO
 }
 
 const Registro: React.FC = () => {
@@ -79,9 +82,8 @@ const Registro: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [facturas, setFacturas] = useState<FacturaVisual[]>([]);
-  const [, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- NUEVO STATE PARA EL VISOR ---
   const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
   const [isViewing, setIsViewing] = useState(false);
 
@@ -97,16 +99,24 @@ const Registro: React.FC = () => {
 
         if (response.ok) {
           const data: FacturaBackend[] = await response.json();
-          const facturasMapeadas: FacturaVisual[] = data.map((item) => ({
-            id: item.id.toString(),
-            fecha: new Date(item.fecha_subida),
-            tipo: item.tipo === "Anulacion" ? "Rectificativa" : "Emitida", 
-            numero: item.numero_factura || item.nombre_archivo,
-            cliente: item.cliente || "General",
-            total: item.total || 0.0,
-            estado: item.estado, 
-            hash: item.hash_actual,
-          }));
+          
+          const facturasMapeadas: FacturaVisual[] = data.map((item) => {
+            // Lógica de detección: Si empieza por F- y tiene 8 números y luego 4 números, es nativa de la App.
+            const esNativa = /^F-\d{8}-\d{4}$/.test(item.numero_factura);
+
+            return {
+              id: item.id.toString(),
+              fecha: new Date(item.fecha_subida),
+              // Ajustado para leer el estado y marcar como Rectificativa correctamente
+              tipo: item.estado === "Evento de Anulación" ? "Rectificativa" : "Emitida", 
+              numero: item.numero_factura || item.nombre_archivo,
+              cliente: item.cliente || "General",
+              total: item.total || 0.0,
+              estado: item.estado, 
+              hash: item.hash_actual,
+              origen: esNativa ? "Nativa" : "Externa"
+            };
+          });
           setFacturas(facturasMapeadas.reverse());
         }
       } catch (error) {
@@ -196,12 +206,10 @@ const Registro: React.FC = () => {
     }
   };
 
-  // --- NUEVA FUNCIÓN: VER PDF (Sin descargar) ---
   const handleViewPdf = async (id: string) => {
     setIsViewing(true);
     try {
         const token = localStorage.getItem('inaltera_token');
-        // Reutilizamos el endpoint de download pero capturamos el blob para visualización
         const response = await fetch(`${API_URL}/api/download/${id}`, { 
             headers: { "Authorization": `Bearer ${token}` } 
         });
@@ -209,7 +217,6 @@ const Registro: React.FC = () => {
         if (!response.ok) throw new Error("Error cargando PDF");
         
         const blob = await response.blob();
-        // Creamos URL temporal para el navegador
         const url = window.URL.createObjectURL(blob);
         setPdfViewerUrl(url);
     } catch (e) {
@@ -219,7 +226,6 @@ const Registro: React.FC = () => {
     }
   };
 
-  // Esta es la función que usa el botón. Llama a downloadSecure internamente.
   const handleDownloadPdf = (id: string, nombreArchivo: string) => {
     downloadSecure(`${API_URL}/api/download/${id}`, nombreArchivo);
   };
@@ -246,11 +252,9 @@ const Registro: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in relative">
       
-      {/* --- MODAL VISOR PDF (NUEVO) --- */}
       {pdfViewerUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col relative animate-in zoom-in-95 duration-200">
-                {/* Cabecera del Modal */}
                 <div className="flex justify-between items-center p-4 border-b">
                     <h3 className="font-bold text-lg flex items-center gap-2">
                         <FileText className="w-5 h-5 text-primary" /> Vista Previa del Documento
@@ -260,15 +264,12 @@ const Registro: React.FC = () => {
                         size="icon" 
                         onClick={() => {
                             setPdfViewerUrl(null);
-                            // Liberamos memoria
                             if (pdfViewerUrl) window.URL.revokeObjectURL(pdfViewerUrl);
                         }}
                     >
                         <X className="w-6 h-6" />
                     </Button>
                 </div>
-                
-                {/* Cuerpo del Modal (Iframe) */}
                 <div className="flex-1 bg-gray-100 p-1 relative">
                     <iframe 
                         src={pdfViewerUrl} 
@@ -276,8 +277,6 @@ const Registro: React.FC = () => {
                         title="Visor PDF"
                     />
                 </div>
-                
-                {/* Pie del Modal */}
                 <div className="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
                     <Button variant="outline" onClick={() => setPdfViewerUrl(null)}>Cerrar</Button>
                 </div>
@@ -295,17 +294,13 @@ const Registro: React.FC = () => {
       <Card className="inaltera-card border shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4">
-            
-            {/* Cabecera y Buscador */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <CardTitle>Histórico</CardTitle>
                   <CardDescription>{filteredFacturas.length} documentos encontrados</CardDescription>
                 </div>
                 
-                {/* Barra de Herramientas */}
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    {/* Buscador */}
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
@@ -316,7 +311,6 @@ const Registro: React.FC = () => {
                         />
                     </div>
 
-                    {/* Filtros de Fecha (Más sutiles) */}
                     <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-md border">
                         <CalendarIcon className="w-4 h-4 text-muted-foreground ml-2" />
                         <Input 
@@ -357,7 +351,7 @@ const Registro: React.FC = () => {
                 <TableRow>
                   <TableHead className="w-[120px]">Fecha</TableHead>
                   <TableHead className="w-[120px]">Tipo</TableHead>
-                  <TableHead>Número</TableHead>
+                  <TableHead>Número / Origen</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead className="text-right">Total (€)</TableHead>
                   <TableHead className="text-center w-[120px]">Estado</TableHead>
@@ -374,9 +368,21 @@ const Registro: React.FC = () => {
                       <TableCell>
                           {getTypeBadge(factura.tipo)}
                       </TableCell>
+                      
+                      {/* --- COLUMNA ACTUALIZADA: NÚMERO Y ORIGEN --- */}
                       <TableCell className={`font-mono text-sm ${factura.estado === 'Anulada' ? 'line-through text-muted-foreground' : ''}`}>
-                        {factura.numero}
+                        <div className="flex flex-col">
+                            <span>{factura.numero}</span>
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 font-sans font-medium">
+                                {factura.origen === "Nativa" ? (
+                                    <><Laptop className="w-3 h-3 text-primary" /> Creada en App</>
+                                ) : (
+                                    <><UploadCloud className="w-3 h-3 text-amber-500" /> Subida externa</>
+                                )}
+                            </span>
+                        </div>
                       </TableCell>
+
                       <TableCell className={factura.estado === 'Anulada' ? 'text-muted-foreground' : 'font-medium'}>
                         {factura.cliente}
                       </TableCell>
@@ -387,7 +393,6 @@ const Registro: React.FC = () => {
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           
-                          {/* BOTÓN VER SIN DESCARGAR (NUEVO) */}
                           {factura.estado !== 'Evento de Anulación' && (
                              <Button
                                 variant="ghost"
