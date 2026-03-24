@@ -28,9 +28,12 @@ const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    // CAMBIO 1: h-screen y overflow-hidden para bloquear el scroll de la ventana
+    <div className="h-screen w-full bg-background flex overflow-hidden">
+      
       {/* Desktop Sidebar */}
-      <div className="hidden md:block">
+      {/* CAMBIO 2: h-full para que ocupe toda la altura disponible */}
+      <div className="hidden md:block h-full">
         <AppSidebar
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -48,7 +51,9 @@ const AppLayout: React.FC = () => {
       </Sheet>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      {/* CAMBIO 3: h-full en lugar de min-h-screen */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        
         {/* Mobile header */}
         <header className="md:hidden bg-card border-b border-border p-4 flex items-center gap-4">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -62,7 +67,8 @@ const AppLayout: React.FC = () => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+        {/* CAMBIO 4: overflow-y-auto aquí, para que SOLO el contenido haga scroll */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto animate-fade-in">
             <Outlet />
           </div>
