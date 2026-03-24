@@ -62,7 +62,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed, onToggle }) => {
   return (
     <aside
       className={cn(
-        'bg-sidebar h-screen flex flex-col border-r border-sidebar-border transition-all duration-300',
+        'bg-sidebar h-full flex flex-col border-r border-sidebar-border transition-all duration-300', // <-- CAMBIADO A h-full
         collapsed ? 'w-[72px]' : 'w-64'
       )}
     >
